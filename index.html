@@ -1,0 +1,2486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>광고비 충전 의사결정 시스템</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #fafaf9;
+  --bg-elev: #ffffff;
+  --bg-card: #f5f5f4;
+  --bg-deeper: #f0f0ee;
+  --border: #e5e5e2;
+  --border-bright: #d4d4d0;
+  --text: #1a1a1a;
+  --text-dim: #595958;
+  --text-faint: #8a8a87;
+  --accent: #2563eb;
+  --accent-dim: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --success: #16a34a;
+  --success-soft: #f0fdf4;
+  --warn: #ea580c;
+  --warn-soft: #fff7ed;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --info: #0891b2;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 32px 40px 80px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--text);
+  margin-bottom: 32px;
+}
+
+.brand { display: flex; align-items: center; gap: 14px; }
+
+.brand-mark {
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.brand-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.brand-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.timestamp {
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.timestamp .live { color: var(--success); margin-right: 6px; }
+
+.btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  border: 1px solid var(--border-bright);
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--text);
+  border-color: var(--text);
+  background: var(--bg-card);
+}
+
+.btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.btn-primary {
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent-dim);
+  color: white;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* Today banner */
+.today-banner {
+  background: var(--danger);
+  color: white;
+  padding: 20px 28px;
+  margin-bottom: 24px;
+  display: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+}
+
+.today-banner.show { display: flex; justify-content: space-between; align-items: center; }
+.today-banner .label { font-size: 18px; font-weight: 700; }
+.today-banner .sub { font-size: 14px; margin-top: 4px; opacity: 0.95; font-weight: 500; }
+.today-banner .amount { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed var(--border-bright);
+  background: var(--bg-elev);
+  padding: 64px 32px;
+  text-align: center;
+  position: relative;
+  transition: all 0.2s;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+.upload-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+.upload-zone.dragover { border-color: var(--accent); background: var(--accent-soft); }
+
+.upload-icon {
+  font-size: 56px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  font-weight: 300;
+}
+
+.upload-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.upload-hint {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.upload-hint code {
+  background: var(--bg-card);
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  margin: 0 4px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+#fileInput { display: none; }
+
+.demo-trigger { text-align: center; margin-top: 16px; }
+.demo-btn {
+  background: none; border: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--text-faint);
+}
+.demo-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Section */
+.section { margin-top: 44px; }
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-bright);
+}
+
+.section-num {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.section-title-sub {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+/* Verdict */
+.verdict {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  padding: 32px 36px;
+  position: relative;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.verdict-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+}
+
+.verdict-cell .label {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+
+.verdict-cell .value {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.verdict-cell .value .unit {
+  font-size: 16px;
+  color: var(--text-dim);
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.verdict-cell .value.accent { color: var(--accent); }
+.verdict-cell .value.warn { color: var(--warn); }
+.verdict-cell .value.success { color: var(--success); }
+.verdict-cell .value.danger { color: var(--danger); }
+
+.verdict-cell .sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* Balance status banner */
+.balance-status {
+  margin-top: 20px;
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.balance-status.ok {
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid #bbf7d0;
+}
+
+.balance-status.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid #fed7aa;
+}
+
+.balance-status.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+}
+
+/* Controls */
+.controls {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  padding: 28px 32px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control label {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.control select, .control input {
+  background: white;
+  border: 1px solid var(--border-bright);
+  color: var(--text);
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: border 0.15s;
+}
+
+.control select:focus, .control input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.control .hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+/* Constraints */
+.constraints {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  padding: 24px 32px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.constraint .label {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.constraint .check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.check-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid;
+  border-radius: 50%;
+}
+
+.check.pass { color: var(--success); }
+.check.pass .check-icon { color: var(--success); border-color: var(--success); }
+.check.fail { color: var(--danger); }
+.check.fail .check-icon { color: var(--danger); border-color: var(--danger); }
+.check.warn { color: var(--warn); }
+.check.warn .check-icon { color: var(--warn); border-color: var(--warn); }
+
+.constraint .detail {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.stat {
+  background: var(--bg-elev);
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.stat .label {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.stat .value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.stat .value .unit {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-left: 3px;
+  font-weight: 600;
+}
+
+.stat .delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.delta.up { color: var(--warn); }
+.delta.down { color: var(--success); }
+.delta.flat { color: var(--text-faint); }
+.delta.danger { color: var(--danger); }
+
+/* Chart */
+.chart-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  padding: 28px 32px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chart-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.legend-swatch { width: 14px; height: 3px; }
+.legend-swatch.dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.svg-chart { width: 100%; height: 340px; }
+.svg-chart-tall { width: 100%; height: 400px; }
+
+/* Weekday */
+.weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+
+.wday {
+  background: var(--bg-elev);
+  padding: 18px 12px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.wday .day-label {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.wday .day-bar {
+  height: 70px;
+  background: var(--bg-deeper);
+  position: relative;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.wday .day-bar-fill {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--accent);
+  opacity: 0.75;
+  transition: height 0.3s;
+}
+
+.wday.peak .day-bar-fill { background: var(--warn); opacity: 0.9; }
+.wday.low .day-bar-fill { background: var(--info); opacity: 0.6; }
+
+.wday .day-amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Tables */
+.data-table {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.sched-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 160px 160px 160px 110px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 14px;
+  gap: 16px;
+}
+
+.sched-row:last-child { border-bottom: none; }
+
+.sched-row.head {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 700;
+  background: var(--bg-card);
+  letter-spacing: 0.02em;
+}
+
+.sched-row.today {
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+}
+
+.sched-row.past { opacity: 0.5; }
+
+.sched-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.sched-row.today .sched-num { color: var(--accent); }
+
+.sched-date {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sched-day {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+.numeric { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+
+.status-pill {
+  display: inline-block;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid;
+  text-align: center;
+  border-radius: 4px;
+}
+.status-pill.today { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.status-pill.upcoming { color: var(--text-dim); border-color: var(--border-bright); }
+.status-pill.brand-day { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+/* Merchant */
+.merchant-row {
+  display: grid;
+  grid-template-columns: 1fr 150px 150px 110px 130px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 14px;
+  gap: 16px;
+}
+
+.merchant-row:last-child { border-bottom: none; }
+
+.merchant-row.head {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 700;
+  background: var(--bg-card);
+  letter-spacing: 0.02em;
+}
+
+.merchant-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.merchant-name .dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.merchant-raw {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.trend-pill {
+  display: inline-block;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid;
+  text-align: center;
+  border-radius: 4px;
+}
+.trend-pill.up { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+.trend-pill.down { color: var(--success); border-color: var(--success); background: var(--success-soft); }
+.trend-pill.flat { color: var(--text-dim); border-color: var(--border-bright); }
+
+/* Recharge history input */
+.recharge-section {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  padding: 28px 32px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.recharge-input-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 100px;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: end;
+}
+
+.recharge-input-row input {
+  background: white;
+  border: 1px solid var(--border-bright);
+  color: var(--text);
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+.recharge-input-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.recharge-list {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.recharge-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-faint);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.recharge-item {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-radius: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.recharge-item .date {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recharge-item .amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.recharge-item .delete-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.recharge-item .delete-btn:hover {
+  background: var(--danger-soft);
+}
+
+.recharge-summary {
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: var(--accent-soft);
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.recharge-summary .label { color: var(--text-dim); }
+.recharge-summary .value { color: var(--accent); font-weight: 800; }
+
+/* Note */
+.note {
+  margin-top: 64px;
+  padding: 24px 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.note strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+#results { display: none; }
+#results.show { display: block; animation: fadeUp 0.4s ease-out; }
+
+/* Sync indicator */
+.sync-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: white;
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 100;
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.sync-indicator.connected .sync-dot {
+  background: var(--success);
+  animation: pulse 2s infinite;
+}
+
+.sync-indicator.syncing .sync-dot {
+  background: var(--accent);
+  animation: pulse 1s infinite;
+}
+
+.sync-indicator.error .sync-dot { background: var(--danger); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-dim);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.modal-close:hover {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 24px 28px;
+}
+
+.modal-desc {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  line-height: 1.7;
+}
+
+.modal-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-section:last-of-type {
+  border-bottom: none;
+}
+
+.modal-section h4 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.modal-section ol {
+  margin-left: 20px;
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.9;
+}
+
+.modal-section ol a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.modal-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.code-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin: 12px 0;
+  white-space: pre;
+}
+
+.modal-field {
+  margin-bottom: 14px;
+}
+
+.modal-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.modal-field input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  background: white;
+}
+
+.modal-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-message {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  display: none;
+}
+
+.modal-message.success {
+  display: block;
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid #bbf7d0;
+}
+
+.modal-message.error {
+  display: block;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 900px) {
+  .container { padding: 20px; }
+  .verdict-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .controls { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .constraints { grid-template-columns: 1fr; }
+  .sched-row { grid-template-columns: 1fr 1fr; font-size: 13px; gap: 8px; }
+  .sched-row > *:nth-child(n+3) { display: none; }
+  .merchant-row { grid-template-columns: 1fr 1fr; font-size: 13px; gap: 8px; }
+  .merchant-row > *:nth-child(n+3) { display: none; }
+  .recharge-input-row { grid-template-columns: 1fr; }
+  .recharge-item { grid-template-columns: 1fr auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Sync status indicator -->
+  <div id="syncIndicator" class="sync-indicator" style="display:none">
+    <span class="sync-dot"></span>
+    <span id="syncStatusText">로컬 저장소만 사용 중</span>
+  </div>
+
+  <!-- Supabase setup modal -->
+  <div class="modal-backdrop" id="syncModal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>☁ 클라우드 동기화 설정</h3>
+        <button class="modal-close" onclick="closeSyncModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Supabase를 연결하면 팀원들과 데이터를 실시간 공유할 수 있습니다.
+          한 명이 데이터를 변경하면 모든 PC에서 즉시 반영됩니다.
+        </p>
+        <div class="modal-section">
+          <h4>1단계 · Supabase 프로젝트 만들기</h4>
+          <ol>
+            <li><a href="https://supabase.com" target="_blank">supabase.com</a> 접속 후 무료 가입 (GitHub 로그인 가능)</li>
+            <li>"New Project" 클릭 → 이름/비밀번호 입력 → 생성 (1~2분 소요)</li>
+            <li>왼쪽 메뉴 <strong>SQL Editor</strong> 클릭</li>
+            <li>아래 SQL을 복사해서 붙여넣고 <strong>RUN</strong> 클릭:</li>
+          </ol>
+          <pre class="code-block" id="sqlSchema">create table ad_state (
+  id text primary key,
+  payload jsonb not null,
+  updated_at timestamptz default now()
+);
+
+alter table ad_state enable row level security;
+
+create policy "open access" on ad_state
+  for all using (true) with check (true);
+
+-- 실시간 동기화 활성화
+alter publication supabase_realtime add table ad_state;</pre>
+          <button class="btn btn-sm" onclick="copySchema()">SQL 복사</button>
+        </div>
+        <div class="modal-section">
+          <h4>2단계 · API 키 입력</h4>
+          <p class="modal-hint">왼쪽 메뉴 <strong>Settings → API</strong>에서 두 값을 복사하세요.</p>
+          <div class="modal-field">
+            <label>Project URL</label>
+            <input type="text" id="supabaseUrl" placeholder="https://xxxxx.supabase.co" />
+          </div>
+          <div class="modal-field">
+            <label>anon public key</label>
+            <input type="text" id="supabaseKey" placeholder="eyJhbGc..." />
+          </div>
+          <div class="modal-field">
+            <label>팀 공유 이름 (영문/숫자, 모든 팀원이 동일하게 입력)</label>
+            <input type="text" id="supabaseRoom" placeholder="our-team" value="default" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" onclick="disconnectSupabase()" id="disconnectBtn" style="display:none">연결 해제</button>
+          <button class="btn btn-primary" onclick="connectSupabase()">연결하고 동기화 시작</button>
+        </div>
+        <div id="syncMessage" class="modal-message"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <header class="header">
+    <div>
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <h1 class="brand-title">광고비 충전 의사결정 시스템</h1>
+      </div>
+      <div class="brand-sub">데이터 기반 선불카드 충전 시뮬레이터</div>
+    </div>
+    <div class="header-actions">
+      <div class="timestamp">
+        <div><span class="live">●</span> LIVE</div>
+        <div id="nowStamp"></div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="syncBtn" onclick="openSyncModal()">☁ 클라우드 동기화</button>
+        <button class="btn" id="notifyBtn" onclick="requestNotify()">🔔 알림 설정</button>
+        <button class="btn btn-danger" id="resetBtn" onclick="resetData()" style="display:none">데이터 초기화</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="today-banner" id="todayBanner">
+    <div>
+      <div class="label">⚠ 오늘 이체 예정일입니다</div>
+      <div class="sub" id="todayBannerSub">권장 이체액 확인 후 송금하세요.</div>
+    </div>
+    <div class="amount" id="todayBannerAmount">—</div>
+  </div>
+
+  <!-- Upload -->
+  <div class="section" id="uploadSection">
+    <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">↑</div>
+      <div class="upload-title">카드 사용내역을 업로드하세요</div>
+      <div class="upload-hint">
+        카드사 다운로드 파일 · <code>.xlsx</code> <code>.xls</code> <code>.csv</code> 지원 · 매월 업로드하면 자동 재계산
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+    </div>
+    <div class="demo-trigger">
+      <button class="demo-btn" onclick="loadDemo()">→ 샘플 데이터로 미리보기</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Verdict -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">01.</div>
+        <h2 class="section-title">의사결정<span class="section-title-sub">권장 충전 계획</span></h2>
+      </div>
+      <div class="verdict">
+        <div class="verdict-grid">
+          <div class="verdict-cell">
+            <div class="label">회당 이체 금액</div>
+            <div class="value accent" id="vAmount">—</div>
+            <div class="sub" id="vAmountSub">—</div>
+          </div>
+          <div class="verdict-cell">
+            <div class="label">주간 총 이체액</div>
+            <div class="value" id="vWeekly">—</div>
+            <div class="sub" id="vWeeklySub">—</div>
+          </div>
+          <div class="verdict-cell">
+            <div class="label">다음 이체일</div>
+            <div class="value" id="vWhen">—</div>
+            <div class="sub" id="vWhenSub">—</div>
+          </div>
+          <div class="verdict-cell">
+            <div class="label">월 예상 소진액</div>
+            <div class="value warn" id="vMonthly">—</div>
+            <div class="sub" id="vMonthlySub">—</div>
+          </div>
+        </div>
+        <div class="balance-status" id="balanceStatus" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Current Balance & Controls -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">02.</div>
+        <h2 class="section-title">시뮬레이션 설정<span class="section-title-sub">잔액 · 빈도 · 예측 모드</span></h2>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <label>현재 잔액 (원)</label>
+          <input type="number" id="balanceInput" value="22058938" step="1000" onchange="recalculate()">
+          <div class="hint">선불카드 실시간 잔액</div>
+        </div>
+        <div class="control">
+          <label>이체 빈도 (주당)</label>
+          <select id="freqSelect" onchange="recalculate()">
+            <option value="2">주 2회 (화/금)</option>
+            <option value="3" selected>주 3회 · 권장 (월/수/금)</option>
+            <option value="4">주 4회 (월/화/목/금)</option>
+            <option value="5">주 5회 (매 영업일)</option>
+          </select>
+          <div class="hint">월/수/금 권장</div>
+        </div>
+        <div class="control">
+          <label>안전 잔액 (원)</label>
+          <input type="number" id="bufferInput" value="8000000" min="0" max="10000000" step="1000000" onchange="recalculate()">
+          <div class="hint">최대 1,000만원</div>
+        </div>
+        <div class="control">
+          <label>예측 모드</label>
+          <select id="forecastMode" onchange="recalculate()">
+            <option value="p90">상위 10% · 안전 (P90)</option>
+            <option value="p75">상위 25% · 보수 (P75)</option>
+            <option value="avg">평균 · 균형</option>
+            <option value="p50" selected>중앙값 · 효율 (P50)</option>
+          </select>
+          <div class="hint">중앙값 권장</div>
+        </div>
+        <div class="control">
+          <label>브랜드데이 가중</label>
+          <select id="brandDayMode" onchange="recalculate()">
+            <option value="1.0" selected>없음</option>
+            <option value="1.2">+20%</option>
+            <option value="1.3">+30%</option>
+            <option value="1.5">+50%</option>
+            <option value="2.0">+100%</option>
+          </select>
+          <div class="hint">트래픽 급증 대비</div>
+        </div>
+        <div class="control">
+          <label>1회 이체 한도 (원)</label>
+          <input type="number" id="limitInput" value="30000000" step="1000000" onchange="recalculate()">
+          <div class="hint">송금 1회 최대액</div>
+        </div>
+      </div>
+      <div class="constraints">
+        <div class="constraint">
+          <div class="label">1회 이체 한도</div>
+          <div class="check" id="cLimit"><span class="check-icon">✓</span><span id="cLimitText">—</span></div>
+          <div class="detail" id="cLimitDetail">—</div>
+        </div>
+        <div class="constraint">
+          <div class="label">안전 잔액 정책</div>
+          <div class="check" id="cBuffer"><span class="check-icon">✓</span><span id="cBufferText">—</span></div>
+          <div class="detail" id="cBufferDetail">—</div>
+        </div>
+        <div class="constraint">
+          <div class="label">주간 최대 소진 커버</div>
+          <div class="check" id="cCover"><span class="check-icon">✓</span><span id="cCoverText">—</span></div>
+          <div class="detail" id="cCoverDetail">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">03.</div>
+        <h2 class="section-title">사용 패턴 지표<span class="section-title-sub">최근 90일 기준</span></h2>
+      </div>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="label">일평균</div>
+          <div class="value numeric" id="sDaily">—</div>
+          <div class="delta" id="sDailyDelta"></div>
+        </div>
+        <div class="stat">
+          <div class="label">표준편차</div>
+          <div class="value numeric" id="sStd">—</div>
+          <div class="delta flat" id="sStdSub"></div>
+        </div>
+        <div class="stat">
+          <div class="label">일 최대</div>
+          <div class="value numeric" id="sMax">—</div>
+          <div class="delta" id="sMaxSub"></div>
+        </div>
+        <div class="stat">
+          <div class="label">주간 최대</div>
+          <div class="value numeric" id="sWeekMax">—</div>
+          <div class="delta" id="sWeekMaxSub"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekday pattern -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">04.</div>
+        <h2 class="section-title">요일별 사용 패턴<span class="section-title-sub">월~일 평균</span></h2>
+      </div>
+      <div class="weekday-grid" id="weekdayGrid"></div>
+    </div>
+
+    <!-- Daily chart -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">05.</div>
+        <h2 class="section-title">일별 사용 & 추세<span class="section-title-sub">90일 추이</span></h2>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">최근 90일 일별 광고비</div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span> 일별 사용액</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--warn); border-top: 1px dashed var(--warn)"></span> 추세선</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--text-dim)"></span> 7일 이동평균</div>
+          </div>
+        </div>
+        <svg id="chart" class="svg-chart" viewBox="0 0 1000 340" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <!-- Balance simulation -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">06.</div>
+        <h2 class="section-title">잔액 시뮬레이션<span class="section-title-sub">향후 4주 예측</span></h2>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">권장 계획 적용 시 일별 잔액 예측</div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span> 예상 잔액</div>
+            <div class="legend-item"><span class="legend-swatch dot" style="background:var(--info)"></span> 이체 시점</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--danger); border-top: 1px dashed var(--danger)"></span> 안전 잔액선</div>
+          </div>
+        </div>
+        <svg id="balChart" class="svg-chart-tall" viewBox="0 0 1000 400" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <!-- Schedule -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">07.</div>
+        <h2 class="section-title">향후 4주 이체 일정<span class="section-title-sub">영업일 기준</span></h2>
+      </div>
+      <div class="data-table" id="scheduleTable">
+        <div class="sched-row head">
+          <div>#</div>
+          <div>이체일</div>
+          <div class="numeric">이체액 (원)</div>
+          <div class="numeric">예상 잔액 (이체후)</div>
+          <div class="numeric">주 누적 (원)</div>
+          <div>상태</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Merchants -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">08.</div>
+        <h2 class="section-title">매체별 분석<span class="section-title-sub">광고 카테고리별 집계</span></h2>
+      </div>
+      <div class="data-table" id="merchants">
+        <div class="merchant-row head">
+          <div>분류</div>
+          <div class="numeric">총 결제 (원)</div>
+          <div class="numeric">일 평균 (원)</div>
+          <div class="numeric">건수</div>
+          <div>추세</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>분류 규칙.</strong> 네이버파이낸셜·네이버페이 비즈월렛 → <strong>스마트스토어</strong> / 카카오_이니시스 → <strong>카카오모먼트</strong> / 카카오(정기결제)_다날 → <strong>키워드광고</strong> / 유니드컴즈·샐러드랩·킵그로우·컷백·채널코퍼레이션·캔바 → <strong>정기결제</strong> / 그 외 → <strong>기타</strong>(원본 매체명 표시).<br><br>
+      <strong>분석 방법.</strong> 일별 집계 → 평균/표준편차/요일별/주간 최대 계산 → 예측 모드(P90 안전 / P75 보수 / avg 균형 / P50 효율)로 회당 이체액 산정. <strong>회당 이체액 = 일 기준값 × (5 영업일 ÷ 주당 빈도) × 브랜드 가중치</strong>로 계산하며, <strong>백만원 단위로 내림</strong> 처리됩니다. 한도 초과 시 자동 캡 적용. 브랜드데이는 평소 "없음"으로 두고, 실제 브랜드데이가 있는 달에만 +30~50%로 한 단계 올리세요. <strong>현재 잔액</strong>은 충전이나 사용이 있을 때마다 수동으로 업데이트해주세요.
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ============ Constants ============
+const STORAGE_KEY = 'ad_recharge_data_v3';
+const CONTROLS_KEY = 'ad_recharge_controls_v3';
+const SUPABASE_CONFIG_KEY = 'ad_recharge_supabase_v3';
+
+const FREQ_DAYS = {
+  2: [2, 5], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5]
+};
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+
+// ============ Supabase sync ============
+let supabaseClient = null;
+let supabaseConfig = null;
+let realtimeChannel = null;
+let suppressNextRealtime = false;
+
+function loadSupabaseConfig() {
+  try {
+    const raw = localStorage.getItem(SUPABASE_CONFIG_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+
+function saveSupabaseConfig(cfg) {
+  localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(cfg));
+}
+
+function openSyncModal() {
+  document.getElementById('syncModal').style.display = 'flex';
+  const cfg = loadSupabaseConfig();
+  if (cfg) {
+    document.getElementById('supabaseUrl').value = cfg.url || '';
+    document.getElementById('supabaseKey').value = cfg.key || '';
+    document.getElementById('supabaseRoom').value = cfg.room || 'default';
+    document.getElementById('disconnectBtn').style.display = supabaseClient ? 'inline-block' : 'none';
+  }
+}
+
+function closeSyncModal() {
+  document.getElementById('syncModal').style.display = 'none';
+  document.getElementById('syncMessage').className = 'modal-message';
+}
+
+function copySchema() {
+  const text = document.getElementById('sqlSchema').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showSyncMessage('success', 'SQL이 클립보드에 복사되었습니다.');
+  });
+}
+
+function showSyncMessage(type, text) {
+  const el = document.getElementById('syncMessage');
+  el.className = 'modal-message ' + type;
+  el.textContent = text;
+}
+
+function updateSyncIndicator(state, text) {
+  const ind = document.getElementById('syncIndicator');
+  ind.style.display = 'flex';
+  ind.className = 'sync-indicator ' + state;
+  document.getElementById('syncStatusText').textContent = text;
+}
+
+async function connectSupabase() {
+  const url = document.getElementById('supabaseUrl').value.trim();
+  const key = document.getElementById('supabaseKey').value.trim();
+  const room = (document.getElementById('supabaseRoom').value.trim() || 'default').replace(/[^a-zA-Z0-9_-]/g, '');
+
+  if (!url || !key) {
+    showSyncMessage('error', 'URL과 API 키를 모두 입력해주세요.');
+    return;
+  }
+
+  try {
+    showSyncMessage('success', '연결 중...');
+    const client = window.supabase.createClient(url, key);
+
+    // 연결 테스트: 테이블 조회 시도
+    const { error: testError } = await client.from('ad_state').select('id').limit(1);
+    if (testError) {
+      showSyncMessage('error', '연결 실패: ' + testError.message + ' (테이블이 생성되었는지 확인하세요)');
+      return;
+    }
+
+    supabaseClient = client;
+    supabaseConfig = { url, key, room };
+    saveSupabaseConfig(supabaseConfig);
+
+    // 기존 클라우드 데이터 불러오기 시도
+    const { data: remoteData, error: fetchErr } = await client
+      .from('ad_state').select('payload').eq('id', room).maybeSingle();
+
+    if (fetchErr) {
+      showSyncMessage('error', '데이터 조회 실패: ' + fetchErr.message);
+      return;
+    }
+
+    if (remoteData && remoteData.payload) {
+      // 클라우드 데이터가 있으면 그것을 사용
+      applyRemoteState(remoteData.payload);
+      showSyncMessage('success', '✓ 연결 완료. 클라우드 데이터를 불러왔습니다.');
+    } else {
+      // 클라우드 데이터가 없으면 로컬 데이터를 클라우드에 업로드
+      await pushToCloud();
+      showSyncMessage('success', '✓ 연결 완료. 로컬 데이터를 클라우드에 업로드했습니다.');
+    }
+
+    // Realtime 구독 시작
+    subscribeRealtime();
+    updateSyncIndicator('connected', `클라우드 연결됨 · 방: ${room}`);
+    document.getElementById('syncBtn').textContent = '☁ 동기화 중';
+    document.getElementById('syncBtn').classList.add('active');
+
+    setTimeout(closeSyncModal, 1500);
+  } catch (err) {
+    showSyncMessage('error', '연결 실패: ' + err.message);
+  }
+}
+
+function disconnectSupabase() {
+  if (realtimeChannel) {
+    supabaseClient.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  supabaseClient = null;
+  supabaseConfig = null;
+  localStorage.removeItem(SUPABASE_CONFIG_KEY);
+  updateSyncIndicator('', '로컬 저장소만 사용 중');
+  document.getElementById('syncBtn').textContent = '☁ 클라우드 동기화';
+  document.getElementById('syncBtn').classList.remove('active');
+  document.getElementById('disconnectBtn').style.display = 'none';
+  showSyncMessage('success', '연결이 해제되었습니다.');
+}
+
+function subscribeRealtime() {
+  if (!supabaseClient || !supabaseConfig) return;
+  if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
+
+  realtimeChannel = supabaseClient
+    .channel('ad_state_' + supabaseConfig.room)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'ad_state', filter: `id=eq.${supabaseConfig.room}` },
+      (payload) => {
+        if (suppressNextRealtime) {
+          suppressNextRealtime = false;
+          return;
+        }
+        if (payload.new && payload.new.payload) {
+          updateSyncIndicator('syncing', '다른 기기에서 변경 감지 · 적용 중...');
+          applyRemoteState(payload.new.payload);
+          setTimeout(() => updateSyncIndicator('connected', `클라우드 연결됨 · 방: ${supabaseConfig.room}`), 1000);
+        }
+      })
+    .subscribe();
+}
+
+function applyRemoteState(payload) {
+  // payload: { records, controls }
+  if (payload.records) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload.records));
+    const recs = payload.records.map(r => ({ ...r, date: new Date(r.date) }));
+    analyze(recs);
+  }
+  if (payload.controls) {
+    localStorage.setItem(CONTROLS_KEY, JSON.stringify(payload.controls));
+    const s = payload.controls;
+    if (s.balance) document.getElementById('balanceInput').value = s.balance;
+    if (s.freq) document.getElementById('freqSelect').value = s.freq;
+    if (s.buffer) document.getElementById('bufferInput').value = s.buffer;
+    if (s.mode) document.getElementById('forecastMode').value = s.mode;
+    if (s.brand) document.getElementById('brandDayMode').value = s.brand;
+    if (s.limit) document.getElementById('limitInput').value = s.limit;
+    recalculate();
+  }
+}
+
+async function pushToCloud() {
+  if (!supabaseClient || !supabaseConfig) return;
+  try {
+    const records = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const controls = JSON.parse(localStorage.getItem(CONTROLS_KEY) || '{}');
+    suppressNextRealtime = true;
+    updateSyncIndicator('syncing', '클라우드 저장 중...');
+    const { error } = await supabaseClient.from('ad_state').upsert({
+      id: supabaseConfig.room,
+      payload: { records, controls },
+      updated_at: new Date().toISOString()
+    });
+    if (error) {
+      updateSyncIndicator('error', '저장 실패: ' + error.message);
+    } else {
+      setTimeout(() => updateSyncIndicator('connected', `클라우드 연결됨 · 방: ${supabaseConfig.room}`), 500);
+    }
+  } catch (e) {
+    updateSyncIndicator('error', '저장 오류');
+  }
+}
+
+// 디바운스: 입력 폭주 시 너무 자주 호출 방지
+let pushTimer = null;
+function pushToCloudDebounced() {
+  if (!supabaseClient) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushToCloud, 800);
+}
+
+// ============ Live timestamp ============
+function updateStamp() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('nowStamp').textContent =
+    `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+updateStamp(); setInterval(updateStamp, 1000);
+
+// ============ Merchant categorization (NEW RULES) ============
+function categorizeMerchant(rawName) {
+  const n = String(rawName).trim();
+
+  // Specific rules first (order matters)
+  if (/네이버파이낸셜|네이버페이.*비즈월렛|비즈월렛/i.test(n)) {
+    return { category: '스마트스토어', isAd: true, original: n };
+  }
+  if (/카카오.*정기결제.*다날|정기결제.*카카오.*다날/i.test(n)) {
+    return { category: '키워드광고', isAd: true, original: n };
+  }
+  if (/카카오.*이니시스|이니시스.*카카오/i.test(n)) {
+    return { category: '카카오모먼트', isAd: true, original: n };
+  }
+  // Subscription services
+  if (/유니드컴즈|샐러드랩|샐러랩|킵그로우|컷백|채널코퍼레이션|캔바|canva/i.test(n)) {
+    return { category: '정기결제', isAd: true, original: n };
+  }
+  // Other ad-like keywords → 기타 광고
+  if (/네이버|naver|카카오|kakao|구글|google|메타|meta|페이스북|facebook|틱톡|tiktok|당근|몰로코|moloco|크리테오|criteo|애드|ads/i.test(n)) {
+    return { category: '기타', isAd: true, original: n };
+  }
+  return { category: null, isAd: false, original: n };
+}
+
+// ============ File handling ============
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+['dragenter', 'dragover'].forEach(e => {
+  dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); });
+});
+['dragleave', 'drop'].forEach(e => {
+  dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); });
+});
+dropZone.addEventListener('drop', ev => {
+  if (ev.dataTransfer.files.length) handleFile(ev.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const parsed = parseRows(rows);
+      if (parsed.length === 0) {
+        alert('광고성 결제 내역을 찾을 수 없어요. 컬럼에 "이용일", "가맹점명", "이용원금"이 있는지 확인해주세요.');
+        return;
+      }
+      saveData(parsed);
+      analyze(parsed);
+    } catch (err) {
+      console.error(err);
+      alert('파일 읽기 오류: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseRows(rows) {
+  let headerIdx = -1;
+  let cols = {};
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const row = rows[i].map(c => String(c).trim());
+    const dateIdx = row.findIndex(c => /이용일|결제일|거래일|승인일|일자/.test(c));
+    const nameIdx = row.findIndex(c => /가맹점|상호|이용처/.test(c));
+    const amtIdx = row.findIndex(c => /이용원금|금액|이용금액|승인금액/.test(c));
+    if (dateIdx >= 0 && nameIdx >= 0 && amtIdx >= 0) {
+      headerIdx = i;
+      cols = { date: dateIdx, name: nameIdx, amount: amtIdx };
+      break;
+    }
+  }
+  if (headerIdx < 0) return [];
+
+  const out = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length === 0) continue;
+    const rawDate = row[cols.date];
+    const name = String(row[cols.name] || '').trim();
+    const amtRaw = row[cols.amount];
+    if (!name || amtRaw === '' || amtRaw == null) continue;
+    const cat = categorizeMerchant(name);
+    if (!cat.isAd) continue;
+    const date = parseDate(rawDate);
+    if (!date) continue;
+    const amount = parseAmount(amtRaw);
+    if (!amount || amount <= 0) continue;
+    out.push({
+      date: date.toISOString(),
+      category: cat.category,
+      original: cat.original,
+      amount
+    });
+  }
+  return out;
+}
+
+function parseDate(v) {
+  if (v instanceof Date) return v;
+  const s = String(v).trim();
+  const m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const num = Number(s);
+  if (!isNaN(num) && num > 30000 && num < 60000) {
+    return new Date(Date.UTC(1899, 11, 30) + num * 86400000);
+  }
+  return null;
+}
+
+function parseAmount(v) {
+  if (typeof v === 'number') return v;
+  const s = String(v).replace(/[^\d.-]/g, '');
+  return parseFloat(s) || 0;
+}
+
+// ============ Storage ============
+function saveData(records) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    document.getElementById('resetBtn').style.display = 'inline-block';
+    pushToCloudDebounced();
+  } catch (e) { console.warn('save failed', e); }
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw).map(r => ({ ...r, date: new Date(r.date) }));
+  } catch (e) { return null; }
+}
+
+function resetData() {
+  if (!confirm('저장된 데이터를 모두 삭제할까요?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(CONTROLS_KEY);
+  location.reload();
+}
+
+// ============ Global state ============
+let currentData = null;
+
+// ============ Analysis ============
+function analyze(records) {
+  const recs = records.map(r => ({
+    ...r,
+    date: r.date instanceof Date ? r.date : new Date(r.date)
+  }));
+  recs.sort((a, b) => a.date - b.date);
+  const latestDate = recs[recs.length-1].date;
+  const cutoff = new Date(latestDate);
+  cutoff.setDate(cutoff.getDate() - 90);
+  const recent = recs.filter(r => r.date >= cutoff);
+
+  // Daily aggregation (in 원)
+  const dailyMap = {};
+  recent.forEach(r => {
+    const key = r.date.toISOString().slice(0, 10);
+    dailyMap[key] = (dailyMap[key] || 0) + r.amount;
+  });
+
+  const series = [];
+  const d = new Date(cutoff);
+  while (d <= latestDate) {
+    const key = d.toISOString().slice(0, 10);
+    series.push({
+      date: new Date(d),
+      amount: dailyMap[key] || 0,
+      weekday: d.getDay()
+    });
+    d.setDate(d.getDate() + 1);
+  }
+
+  // Linear regression
+  const n = series.length;
+  const xs = series.map((_, i) => i);
+  const ys = series.map(s => s.amount);
+  const sumX = xs.reduce((a,b) => a+b, 0);
+  const sumY = ys.reduce((a,b) => a+b, 0);
+  const sumXY = xs.reduce((a, x, i) => a + x*ys[i], 0);
+  const sumX2 = xs.reduce((a, x) => a + x*x, 0);
+  const slope = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+  const intercept = (sumY - slope*sumX) / n;
+
+  const dailyAvg = sumY / n;
+  const stdDev = Math.sqrt(ys.reduce((a, y) => a + (y-dailyAvg)**2, 0) / n);
+  const dailyMax = Math.max(...ys);
+  const dailyMaxIdx = ys.indexOf(dailyMax);
+  const dailyMaxDate = series[dailyMaxIdx].date;
+
+  const sortedYs = [...ys].sort((a,b) => a-b);
+  const p90 = sortedYs[Math.floor(sortedYs.length * 0.9)];
+  const p75 = sortedYs[Math.floor(sortedYs.length * 0.75)];
+  const p50 = sortedYs[Math.floor(sortedYs.length * 0.5)];
+
+  // Weekly
+  const weeklyMap = {};
+  series.forEach(s => {
+    const monday = new Date(s.date);
+    const day = monday.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    monday.setDate(monday.getDate() + diff);
+    const key = monday.toISOString().slice(0,10);
+    weeklyMap[key] = (weeklyMap[key] || 0) + s.amount;
+  });
+  const weeklyTotals = Object.values(weeklyMap);
+  const weekMax = Math.max(...weeklyTotals);
+
+  // Weekday averages
+  const wdaySum = [0,0,0,0,0,0,0];
+  const wdayCnt = [0,0,0,0,0,0,0];
+  series.forEach(s => {
+    wdaySum[s.weekday] += s.amount;
+    wdayCnt[s.weekday] += 1;
+  });
+  const wdayAvg = wdaySum.map((sum, i) => wdayCnt[i] ? sum/wdayCnt[i] : 0);
+
+  // 7-day MA
+  const ma = [];
+  for (let i = 0; i < series.length; i++) {
+    const start = Math.max(0, i - 6);
+    const slice = ys.slice(start, i+1);
+    ma.push(slice.reduce((a,b) => a+b, 0) / slice.length);
+  }
+
+  // Per category
+  const byCategory = {};
+  recent.forEach(r => {
+    if (!byCategory[r.category]) {
+      byCategory[r.category] = { total: 0, count: 0, originals: new Set() };
+    }
+    byCategory[r.category].total += r.amount;
+    byCategory[r.category].count += 1;
+    byCategory[r.category].originals.add(r.original);
+  });
+  const categoryOrder = ['스마트스토어', '카카오모먼트', '키워드광고', '정기결제', '기타'];
+  const merchantList = categoryOrder
+    .filter(c => byCategory[c])
+    .map(name => {
+      const d = byCategory[name];
+      const recentSum = recent
+        .filter(r => r.category === name && r.date >= new Date(latestDate.getTime() - 30*86400000))
+        .reduce((a,r) => a+r.amount, 0);
+      const olderSum = recent
+        .filter(r => r.category === name && r.date < new Date(latestDate.getTime() - 30*86400000)
+                && r.date >= new Date(latestDate.getTime() - 60*86400000))
+        .reduce((a,r) => a+r.amount, 0);
+      let trend = 'flat';
+      if (olderSum > 0) {
+        const ratio = recentSum / olderSum;
+        if (ratio > 1.15) trend = 'up';
+        else if (ratio < 0.85) trend = 'down';
+      }
+      return {
+        name,
+        total: d.total,
+        count: d.count,
+        daily: d.total / n,
+        trend,
+        originals: Array.from(d.originals)
+      };
+    });
+
+  currentData = {
+    series, slope, intercept, dailyAvg, stdDev, dailyMax, dailyMaxDate,
+    p90, p75, p50, weekMax, wdayAvg, ma, merchantList,
+    totalCount: recent.length, latestDate, n
+  };
+
+  recalculate();
+}
+
+// ============ Recalculate ============
+function recalculate() {
+  if (!currentData) return;
+  const data = currentData;
+
+  const balance = parseFloat(document.getElementById('balanceInput').value) || 0;
+  const freq = parseInt(document.getElementById('freqSelect').value);
+  const buffer = parseFloat(document.getElementById('bufferInput').value) || 0;
+  const mode = document.getElementById('forecastMode').value;
+  const brandWeight = parseFloat(document.getElementById('brandDayMode').value);
+  const transferLimit = parseFloat(document.getElementById('limitInput').value) || 30000000;
+
+  let dailyForecast;
+  if (mode === 'p90') dailyForecast = data.p90;
+  else if (mode === 'p75') dailyForecast = data.p75;
+  else if (mode === 'p50') dailyForecast = data.p50;
+  else dailyForecast = data.dailyAvg;
+
+  // 영업일 기준 사이클: 광고비는 평일에만 쓰이므로 주 5일 영업일 기준
+  const cycleDays = 5 / freq;
+  let perTransferRaw = dailyForecast * cycleDays * brandWeight;
+
+  // 백만원 단위로 내림 (효율 우선)
+  const ROUND_UNIT = 1000000;
+  let perTransfer = Math.floor(perTransferRaw / ROUND_UNIT) * ROUND_UNIT;
+  if (perTransfer < ROUND_UNIT) perTransfer = ROUND_UNIT; // 최소 1백만원
+
+  let limitHit = false;
+  if (perTransfer > transferLimit) {
+    perTransfer = Math.floor(transferLimit / ROUND_UNIT) * ROUND_UNIT;
+    limitHit = true;
+  }
+
+  const weeklyTotal = perTransfer * freq;
+  const monthlyForecast = dailyForecast * 30 * brandWeight;
+
+  // Days until balance hits safety buffer (given current daily forecast)
+  const usableBalance = balance - buffer;
+  const daysUntilLow = usableBalance > 0 ? Math.floor(usableBalance / dailyForecast) : 0;
+
+  // Constraint checks
+  updateConstraint('cLimit', limitHit,
+    limitHit ? '한도 도달' : '통과',
+    limitHit
+      ? `이상값 ${fmt(perTransferRaw)}원 → ${fmt(perTransfer)}원 캡 적용`
+      : `회당 ${fmt(perTransfer)}원 ≤ ${fmt(transferLimit)}원`
+  );
+
+  updateConstraint('cBuffer', buffer > 10000000 ? 'fail' : false,
+    buffer > 10000000 ? '초과' : '통과',
+    `${fmt(buffer)}원 ${buffer > 10000000 ? '>' : '≤'} 1,000만원`
+  );
+
+  const coverRatio = weeklyTotal / data.weekMax;
+  let coverState, coverText, coverDetail;
+  if (coverRatio >= 1.0) {
+    coverState = false;
+    coverText = '안전';
+    coverDetail = `주 ${fmt(weeklyTotal)}원 ≥ 최대 주 ${fmt(data.weekMax)}원`;
+  } else if (coverRatio >= 0.85) {
+    coverState = 'warn';
+    coverText = '주의';
+    coverDetail = `주 ${fmt(weeklyTotal)}원 < 최대 주 ${fmt(data.weekMax)}원 (${Math.round(coverRatio*100)}%)`;
+  } else {
+    coverState = 'fail';
+    coverText = '커버 부족';
+    coverDetail = `빈도를 ${freq+1}회로 늘리세요. 현재 ${Math.round(coverRatio*100)}%`;
+  }
+  updateConstraint('cCover', coverState, coverText, coverDetail);
+
+  const schedule = generateSchedule(freq, perTransfer, dailyForecast, buffer, balance);
+
+  render({
+    ...data,
+    freq, buffer, mode, brandWeight, dailyForecast,
+    perTransfer, weeklyTotal, monthlyForecast,
+    balance, daysUntilLow, transferLimit,
+    schedule
+  });
+}
+
+function updateConstraint(id, state, text, detail) {
+  const el = document.getElementById(id);
+  const icon = el.querySelector('.check-icon');
+  if (state === 'fail') {
+    el.className = 'check fail';
+    icon.textContent = '✗';
+  } else if (state === 'warn' || state === true) {
+    el.className = 'check warn';
+    icon.textContent = '!';
+  } else {
+    el.className = 'check pass';
+    icon.textContent = '✓';
+  }
+  document.getElementById(id + 'Text').textContent = text;
+  document.getElementById(id + 'Detail').textContent = detail;
+}
+
+function generateSchedule(freq, perTransfer, dailyForecast, buffer, currentBalance) {
+  const days = FREQ_DAYS[freq];
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const transfers = [];
+  for (let i = 0; i < 28; i++) {
+    const day = new Date(today);
+    day.setDate(today.getDate() + i);
+    const wd = day.getDay();
+    if (days.includes(wd)) {
+      transfers.push({
+        date: new Date(day),
+        weekday: wd,
+        amount: perTransfer,
+        isToday: i === 0
+      });
+    }
+  }
+
+  // Week totals
+  const weekMap = {};
+  transfers.forEach(s => {
+    const monday = new Date(s.date);
+    const day = monday.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    monday.setDate(monday.getDate() + diff);
+    const key = monday.toISOString().slice(0,10);
+    weekMap[key] = (weekMap[key] || 0) + s.amount;
+    s.weekKey = key;
+  });
+  transfers.forEach(s => { s.weekTotal = weekMap[s.weekKey]; });
+
+  // Simulate balance starting from currentBalance
+  let bal = currentBalance;
+  let transferIdx = 0;
+  const balanceTimeline = [];
+  for (let i = 0; i < 28; i++) {
+    const day = new Date(today);
+    day.setDate(today.getDate() + i);
+    // Transfer at start of day if scheduled
+    if (transferIdx < transfers.length && transfers[transferIdx].date.getTime() === day.getTime()) {
+      bal += perTransfer;
+      transfers[transferIdx].balanceAfter = bal;
+      transferIdx++;
+    }
+    balanceTimeline.push({ date: new Date(day), balance: bal });
+    // Subtract daily usage
+    bal -= dailyForecast;
+  }
+
+  return { transfers, balanceTimeline };
+}
+
+// ============ Render ============
+function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
+
+function fmtDate(d, full=true) {
+  const pad = x => String(x).padStart(2,'0');
+  if (full) return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+  return `${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
+}
+
+function render(r) {
+  document.getElementById('results').classList.add('show');
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('resetBtn').style.display = 'inline-block';
+
+  // Verdict
+  document.getElementById('vAmount').innerHTML = fmt(r.perTransfer) + '<span class="unit">원</span>';
+  document.getElementById('vAmountSub').textContent =
+    `${r.freq}회/주 · ${r.mode.toUpperCase()} 예측 · 브랜드 ×${r.brandWeight}`;
+
+  document.getElementById('vWeekly').innerHTML = fmt(r.weeklyTotal) + '<span class="unit">원</span>';
+  document.getElementById('vWeeklySub').textContent = `주 ${r.freq}회 × ${fmt(r.perTransfer)}원`;
+
+  // Next transfer
+  const todayMs = new Date().setHours(0,0,0,0);
+  const nextTransfer = r.schedule.transfers.find(t => t.date >= todayMs);
+  if (nextTransfer) {
+    document.getElementById('vWhen').textContent = fmtDate(nextTransfer.date);
+    const daysLeft = Math.round((nextTransfer.date - todayMs) / 86400000);
+    document.getElementById('vWhenSub').textContent =
+      daysLeft === 0 ? '오늘 이체' : `${daysLeft}일 후 (${WEEKDAY_LABELS[nextTransfer.weekday]}요일)`;
+
+    if (daysLeft === 0) {
+      document.getElementById('todayBanner').classList.add('show');
+      document.getElementById('todayBannerAmount').textContent = fmt(r.perTransfer) + '원';
+      document.getElementById('todayBannerSub').textContent =
+        `현재 잔액 ${fmt(r.balance)}원 → 권장 이체액 ${fmt(r.perTransfer)}원`;
+      tryNotify(r.perTransfer);
+    }
+  }
+
+  document.getElementById('vMonthly').innerHTML = fmt(r.monthlyForecast) + '<span class="unit">원</span>';
+  document.getElementById('vMonthlySub').textContent = `일 ${fmt(r.dailyForecast)}원 × 30일`;
+
+  // Balance status banner
+  const statusEl = document.getElementById('balanceStatus');
+  statusEl.style.display = 'flex';
+
+  if (r.balance <= r.buffer) {
+    statusEl.className = 'balance-status danger';
+    statusEl.innerHTML = `<span style="font-size:20px">⚠</span> <strong>긴급:</strong> 현재 잔액 ${fmt(r.balance)}원이 안전 잔액 ${fmt(r.buffer)}원 이하입니다. 즉시 충전이 필요합니다.`;
+  } else if (r.daysUntilLow <= 2) {
+    statusEl.className = 'balance-status warn';
+    statusEl.innerHTML = `<span style="font-size:20px">⚠</span> <strong>주의:</strong> 현재 잔액 ${fmt(r.balance)}원으로 약 ${r.daysUntilLow}일 후 안전선 도달 예상. 다음 영업일 충전 권장.`;
+  } else {
+    statusEl.className = 'balance-status ok';
+    statusEl.innerHTML = `<span style="font-size:20px">✓</span> <strong>안정:</strong> 현재 잔액 ${fmt(r.balance)}원으로 약 ${r.daysUntilLow}일치 광고비 보유. 다음 정기 이체일까지 여유가 있습니다.`;
+  }
+
+  // Stats
+  document.getElementById('sDaily').innerHTML = fmt(r.dailyAvg) + '<span class="unit">원</span>';
+  document.getElementById('sDailyDelta').className = 'delta flat';
+  document.getElementById('sDailyDelta').textContent = `90일 평균 · ${r.n}일치`;
+
+  document.getElementById('sStd').innerHTML = fmt(r.stdDev) + '<span class="unit">원</span>';
+  document.getElementById('sStdSub').textContent = `변동성 ${Math.round(r.stdDev/r.dailyAvg*100)}%`;
+
+  document.getElementById('sMax').innerHTML = fmt(r.dailyMax) + '<span class="unit">원</span>';
+  document.getElementById('sMaxSub').className = 'delta up';
+  document.getElementById('sMaxSub').textContent = `${fmtDate(r.dailyMaxDate)} (${WEEKDAY_LABELS[r.dailyMaxDate.getDay()]})`;
+
+  document.getElementById('sWeekMax').innerHTML = fmt(r.weekMax) + '<span class="unit">원</span>';
+  document.getElementById('sWeekMaxSub').className = 'delta up';
+  document.getElementById('sWeekMaxSub').textContent = `최대 주간 사용액`;
+
+  renderWeekdays(r.wdayAvg);
+  drawChart(r.series, r.slope, r.intercept, r.ma);
+  drawBalanceChart(r.schedule.balanceTimeline, r.schedule.transfers, r.buffer);
+  renderSchedule(r.schedule.transfers, r.buffer);
+  renderMerchants(r.merchantList);
+  saveControlState();
+}
+
+function renderWeekdays(wdayAvg) {
+  const grid = document.getElementById('weekdayGrid');
+  grid.innerHTML = '';
+  const max = Math.max(...wdayAvg);
+  const min = Math.min(...wdayAvg.filter(v => v > 0));
+  const order = [1,2,3,4,5,6,0];
+  order.forEach(idx => {
+    const v = wdayAvg[idx];
+    const pct = max > 0 ? (v / max * 100) : 0;
+    const isPeak = v === max;
+    const isLow = v === min && v > 0;
+    const cell = document.createElement('div');
+    cell.className = 'wday' + (isPeak ? ' peak' : '') + (isLow ? ' low' : '');
+    cell.innerHTML = `
+      <div class="day-label">${WEEKDAY_LABELS[idx]}</div>
+      <div class="day-bar"><div class="day-bar-fill" style="height: ${pct}%"></div></div>
+      <div class="day-amount">${fmt(v)}원</div>
+    `;
+    grid.appendChild(cell);
+  });
+}
+
+function drawChart(series, slope, intercept, ma) {
+  const svg = document.getElementById('chart');
+  svg.innerHTML = '';
+  const W = 1000, H = 340;
+  const padL = 80, padR = 20, padT = 20, padB = 40;
+  const w = W - padL - padR;
+  const h = H - padT - padB;
+
+  const ys = series.map(s => s.amount);
+  const maxY = Math.max(...ys, slope*(series.length-1) + intercept) * 1.15 || 1;
+  const xScale = i => padL + (i / Math.max(series.length-1, 1)) * w;
+  const yScale = v => padT + h - (v / maxY) * h;
+
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padT + (i / gridLines) * h;
+    const val = maxY * (1 - i / gridLines);
+    svg.innerHTML += `<line x1="${padL}" y1="${y}" x2="${padL+w}" y2="${y}" stroke="#e5e5e2" stroke-width="0.8"/>`;
+    svg.innerHTML += `<text x="${padL - 8}" y="${y + 4}" text-anchor="end" fill="#8a8a87" font-size="11" font-weight="500">${fmtCompact(val)}</text>`;
+  }
+
+  const xStep = Math.max(1, Math.floor(series.length / 6));
+  for (let i = 0; i < series.length; i += xStep) {
+    const x = xScale(i);
+    svg.innerHTML += `<line x1="${x}" y1="${padT+h}" x2="${x}" y2="${padT+h+4}" stroke="#d4d4d0" stroke-width="0.8"/>`;
+    svg.innerHTML += `<text x="${x}" y="${padT+h+20}" text-anchor="middle" fill="#8a8a87" font-size="11" font-weight="500">${fmtDate(series[i].date, false)}</text>`;
+  }
+
+  series.forEach((s, i) => {
+    if (s.amount > 0) {
+      const x = xScale(i);
+      const y = yScale(s.amount);
+      const barW = Math.max(2, w / series.length - 1);
+      svg.innerHTML += `<rect x="${x - barW/2}" y="${y}" width="${barW}" height="${padT + h - y}" fill="#2563eb" opacity="0.65"/>`;
+    }
+  });
+
+  const maPath = ma.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)} ${yScale(v)}`).join(' ');
+  svg.innerHTML += `<path d="${maPath}" fill="none" stroke="#595958" stroke-width="2" opacity="0.7"/>`;
+
+  const tx1 = xScale(0);
+  const ty1 = yScale(intercept);
+  const tx2 = xScale(series.length - 1);
+  const ty2 = yScale(slope * (series.length-1) + intercept);
+  svg.innerHTML += `<line x1="${tx1}" y1="${ty1}" x2="${tx2}" y2="${ty2}" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>`;
+}
+
+function fmtCompact(n) {
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '억';
+  if (n >= 10000) return Math.round(n / 10000) + '만';
+  return Math.round(n).toString();
+}
+
+function drawBalanceChart(timeline, transfers, buffer) {
+  const svg = document.getElementById('balChart');
+  svg.innerHTML = '';
+  const W = 1000, H = 400;
+  const padL = 90, padR = 20, padT = 20, padB = 50;
+  const w = W - padL - padR;
+  const h = H - padT - padB;
+
+  if (!timeline.length) return;
+  const balances = timeline.map(t => t.balance);
+  const maxY = Math.max(...balances, buffer * 2) * 1.15;
+  const minY = Math.min(0, Math.min(...balances) - 2000000);
+  const yRange = maxY - minY;
+  const xScale = i => padL + (i / (timeline.length-1)) * w;
+  const yScale = v => padT + h - ((v - minY) / yRange) * h;
+
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padT + (i / gridLines) * h;
+    const val = maxY - (maxY - minY) * (i / gridLines);
+    svg.innerHTML += `<line x1="${padL}" y1="${y}" x2="${padL+w}" y2="${y}" stroke="#e5e5e2" stroke-width="0.8"/>`;
+    svg.innerHTML += `<text x="${padL - 8}" y="${y + 4}" text-anchor="end" fill="#8a8a87" font-size="11" font-weight="500">${fmtCompact(val)}</text>`;
+  }
+
+  for (let i = 0; i < timeline.length; i += 7) {
+    const x = xScale(i);
+    svg.innerHTML += `<line x1="${x}" y1="${padT+h}" x2="${x}" y2="${padT+h+4}" stroke="#d4d4d0" stroke-width="0.8"/>`;
+    svg.innerHTML += `<text x="${x}" y="${padT+h+20}" text-anchor="middle" fill="#8a8a87" font-size="11" font-weight="500">${fmtDate(timeline[i].date, false)}</text>`;
+  }
+
+  const bufY = yScale(buffer);
+  svg.innerHTML += `<line x1="${padL}" y1="${bufY}" x2="${padL+w}" y2="${bufY}" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.8"/>`;
+  svg.innerHTML += `<text x="${padL+w-5}" y="${bufY - 6}" text-anchor="end" fill="#dc2626" font-size="11" font-weight="600">안전 잔액 ${fmtCompact(buffer)}원</text>`;
+
+  const zeroY = yScale(0);
+  if (zeroY > padT && zeroY < padT + h) {
+    svg.innerHTML += `<line x1="${padL}" y1="${zeroY}" x2="${padL+w}" y2="${zeroY}" stroke="#dc2626" stroke-width="1" opacity="0.4"/>`;
+  }
+
+  transfers.forEach(t => {
+    const i = Math.round((t.date - timeline[0].date) / 86400000);
+    if (i >= 0 && i < timeline.length) {
+      const x = xScale(i);
+      svg.innerHTML += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT+h}" stroke="#0891b2" stroke-width="1" opacity="0.25"/>`;
+      svg.innerHTML += `<circle cx="${x}" cy="${yScale(t.balanceAfter)}" r="5" fill="#0891b2" stroke="white" stroke-width="2"/>`;
+    }
+  });
+
+  // Area fill
+  const areaPath = timeline.map((t, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)} ${yScale(t.balance)}`).join(' ')
+    + ` L ${xScale(timeline.length-1)} ${yScale(minY)} L ${xScale(0)} ${yScale(minY)} Z`;
+  svg.innerHTML += `<path d="${areaPath}" fill="#2563eb" opacity="0.1"/>`;
+
+  // Balance line
+  const balPath = timeline.map((t, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)} ${yScale(t.balance)}`).join(' ');
+  svg.innerHTML += `<path d="${balPath}" fill="none" stroke="#2563eb" stroke-width="2.5"/>`;
+}
+
+function renderSchedule(transfers, buffer) {
+  const table = document.getElementById('scheduleTable');
+  while (table.children.length > 1) table.removeChild(table.lastChild);
+
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  transfers.forEach((t, idx) => {
+    const isToday = t.date.getTime() === today.getTime();
+    const isPast = t.date < today;
+    const row = document.createElement('div');
+    row.className = 'sched-row' + (isToday ? ' today' : '') + (isPast ? ' past' : '');
+
+    const isBrandRisk = t.weekday === 1;
+    let statusHTML;
+    if (isToday) {
+      statusHTML = '<span class="status-pill today">오늘</span>';
+    } else if (isBrandRisk && idx < 4) {
+      statusHTML = '<span class="status-pill brand-day">월요일</span>';
+    } else {
+      statusHTML = '<span class="status-pill upcoming">예정</span>';
+    }
+
+    row.innerHTML = `
+      <div class="sched-num">${String(idx+1).padStart(2,'0')}</div>
+      <div>
+        <span class="sched-date">${fmtDate(t.date)}</span>
+        <span class="sched-day">${WEEKDAY_LABELS[t.weekday]}요일</span>
+      </div>
+      <div class="numeric">${fmt(t.amount)}</div>
+      <div class="numeric">${fmt(t.balanceAfter || 0)}</div>
+      <div class="numeric">${fmt(t.weekTotal)}</div>
+      <div>${statusHTML}</div>
+    `;
+    table.appendChild(row);
+  });
+}
+
+function renderMerchants(list) {
+  const wrap = document.getElementById('merchants');
+  while (wrap.children.length > 1) wrap.removeChild(wrap.lastChild);
+  const colors = {
+    '스마트스토어': '#2563eb',
+    '카카오모먼트': '#f59e0b',
+    '키워드광고': '#ec4899',
+    '정기결제': '#8b5cf6',
+    '기타': '#6b7280'
+  };
+  list.forEach((m) => {
+    const row = document.createElement('div');
+    row.className = 'merchant-row';
+    const trendLabel = m.trend === 'up' ? '↑ 증가' : m.trend === 'down' ? '↓ 감소' : '→ 안정';
+    const originalsHtml = m.name === '기타'
+      ? `<div class="merchant-raw">${m.originals.slice(0, 3).join(' · ')}${m.originals.length > 3 ? ` 외 ${m.originals.length - 3}건` : ''}</div>`
+      : '';
+    row.innerHTML = `
+      <div>
+        <div class="merchant-name"><span class="dot" style="background:${colors[m.name] || '#6b7280'}"></span>${m.name}</div>
+        ${originalsHtml}
+      </div>
+      <div class="numeric">${fmt(m.total)}</div>
+      <div class="numeric">${fmt(m.daily)}</div>
+      <div class="numeric">${m.count}건</div>
+      <div><span class="trend-pill ${m.trend}">${trendLabel}</span></div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+// ============ Control state ============
+function saveControlState() {
+  const state = {
+    balance: document.getElementById('balanceInput').value,
+    freq: document.getElementById('freqSelect').value,
+    buffer: document.getElementById('bufferInput').value,
+    mode: document.getElementById('forecastMode').value,
+    brand: document.getElementById('brandDayMode').value,
+    limit: document.getElementById('limitInput').value
+  };
+  localStorage.setItem(CONTROLS_KEY, JSON.stringify(state));
+  pushToCloudDebounced();
+}
+
+function loadControlState() {
+  try {
+    const raw = localStorage.getItem(CONTROLS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    // 마이그레이션: 기존 보수적인 기본값 → 새 효율적인 기본값
+    if (s.mode === 'p75' && s.brand === '1.5') {
+      s.mode = 'p50';
+      s.brand = '1.0';
+    }
+    if (s.balance) document.getElementById('balanceInput').value = s.balance;
+    if (s.freq) document.getElementById('freqSelect').value = s.freq;
+    if (s.buffer) document.getElementById('bufferInput').value = s.buffer;
+    if (s.mode) document.getElementById('forecastMode').value = s.mode;
+    if (s.brand) document.getElementById('brandDayMode').value = s.brand;
+    if (s.limit) document.getElementById('limitInput').value = s.limit;
+  } catch (e) {}
+}
+
+// ============ Notification ============
+function requestNotify() {
+  if (!('Notification' in window)) {
+    alert('이 브라우저는 알림을 지원하지 않습니다.');
+    return;
+  }
+  Notification.requestPermission().then(p => {
+    const btn = document.getElementById('notifyBtn');
+    if (p === 'granted') {
+      btn.textContent = '🔔 알림 활성';
+      btn.classList.add('active');
+      new Notification('광고비 충전 시스템', { body: '이체일 알림이 활성화되었습니다.' });
+    }
+  });
+}
+
+let lastNotifyKey = null;
+function tryNotify(amount) {
+  if (Notification.permission !== 'granted') return;
+  const today = new Date().toISOString().slice(0,10);
+  if (lastNotifyKey === today) return;
+  lastNotifyKey = today;
+  new Notification('오늘은 광고비 이체일입니다', {
+    body: `권장 이체액: ${fmt(amount)}원`
+  });
+}
+
+// ============ Demo data ============
+function loadDemo() {
+  const records = [];
+  const today = new Date();
+  const sources = [
+    { raw: '네이버파이낸셜(주)', avg: 9500000, freq: 0.95 },
+    { raw: '주식회사 카카오_카카오_이니시스', avg: 380000, freq: 0.5 },
+    { raw: '주식회사 카카오_카카오(정기결제)_다날', avg: 350000, freq: 0.4 },
+    { raw: '네이버페이_비즈월렛', avg: 2500000, freq: 0.7 },
+    { raw: '(주)유니드컴즈_나이스정보통신', avg: 80000, freq: 0.3 },
+    { raw: '샐러드랩_나이스정보통신', avg: 250000, freq: 0.35 },
+    { raw: '킵그로우(주)', avg: 120000, freq: 0.2 },
+    { raw: '캔바(Canva)', avg: 18000, freq: 0.15 },
+    { raw: '구글', avg: 450000, freq: 0.4 },
+  ];
+  for (let i = 90; i >= 0; i--) {
+    const day = new Date(today);
+    day.setDate(today.getDate() - i);
+    const wd = day.getDay();
+    const wdayMult = wd === 1 ? 1.25 : wd === 6 ? 0.6 : wd === 0 ? 0.85 : 1.0;
+    sources.forEach(s => {
+      if (Math.random() < s.freq) {
+        const v = 0.7 + Math.random() * 0.6;
+        const cat = categorizeMerchant(s.raw);
+        records.push({
+          date: day.toISOString(),
+          category: cat.category,
+          original: cat.original,
+          amount: Math.round(s.avg * v * wdayMult)
+        });
+      }
+    });
+  }
+  saveData(records);
+  analyze(records);
+}
+
+// ============ Init ============
+loadControlState();
+const saved = loadData();
+if (saved && saved.length > 0) analyze(saved);
+
+if ('Notification' in window && Notification.permission === 'granted') {
+  document.getElementById('notifyBtn').textContent = '🔔 알림 활성';
+  document.getElementById('notifyBtn').classList.add('active');
+}
+
+// Auto-reconnect Supabase
+(async function autoConnectSupabase() {
+  const cfg = loadSupabaseConfig();
+  if (!cfg || !cfg.url || !cfg.key) {
+    updateSyncIndicator('', '로컬 저장소만 사용 중');
+    return;
+  }
+  try {
+    updateSyncIndicator('syncing', '클라우드 연결 중...');
+    const client = window.supabase.createClient(cfg.url, cfg.key);
+    const { error: testError } = await client.from('ad_state').select('id').limit(1);
+    if (testError) {
+      updateSyncIndicator('error', '클라우드 연결 실패');
+      return;
+    }
+    supabaseClient = client;
+    supabaseConfig = cfg;
+
+    // 클라우드에서 최신 데이터 가져오기
+    const { data: remoteData } = await client
+      .from('ad_state').select('payload').eq('id', cfg.room).maybeSingle();
+    if (remoteData && remoteData.payload) {
+      applyRemoteState(remoteData.payload);
+    }
+    subscribeRealtime();
+    updateSyncIndicator('connected', `클라우드 연결됨 · 방: ${cfg.room}`);
+    document.getElementById('syncBtn').textContent = '☁ 동기화 중';
+    document.getElementById('syncBtn').classList.add('active');
+  } catch (e) {
+    updateSyncIndicator('error', '연결 오류');
+  }
+})();
+</script>
+
+</body>
+</html>
