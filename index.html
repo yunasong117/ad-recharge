@@ -833,6 +833,75 @@ html, body {
 #results { display: none; }
 #results.show { display: block; animation: fadeUp 0.4s ease-out; }
 
+/* Per-day transfer grid */
+.per-day-grid {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.per-day-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+
+.per-day-hint {
+  font-weight: 500;
+  color: var(--text-faint);
+  margin-left: 6px;
+}
+
+.per-day-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.per-day-cell {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  position: relative;
+}
+
+.per-day-cell.peak {
+  background: var(--warn-soft);
+  border-color: #fed7aa;
+}
+
+.per-day-cell.low {
+  background: var(--success-soft);
+  border-color: #bbf7d0;
+}
+
+.per-day-cell .day-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.per-day-cell .day-amount {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.per-day-cell.peak .day-amount { color: var(--warn); }
+.per-day-cell.low .day-amount { color: var(--success); }
+
+.per-day-cell .day-covers {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
 /* Sync indicator */
 .sync-indicator {
   position: fixed;
@@ -1191,7 +1260,7 @@ alter publication supabase_realtime add table ad_state;</pre>
       <div class="verdict">
         <div class="verdict-grid">
           <div class="verdict-cell">
-            <div class="label">회당 이체 금액</div>
+            <div class="label">다음 이체액</div>
             <div class="value accent" id="vAmount">—</div>
             <div class="sub" id="vAmountSub">—</div>
           </div>
@@ -1212,6 +1281,10 @@ alter publication supabase_realtime add table ad_state;</pre>
           </div>
         </div>
         <div class="balance-status" id="balanceStatus" style="display:none"></div>
+        <div class="per-day-grid" id="perDayGrid" style="display:none">
+          <div class="per-day-header">요일별 권장 이체액 <span class="per-day-hint">· 각 이체일이 커버하는 사용량 기준</span></div>
+          <div class="per-day-cells" id="perDayCells"></div>
+        </div>
       </div>
     </div>
 
@@ -1402,7 +1475,8 @@ alter publication supabase_realtime add table ad_state;</pre>
 
     <div class="note">
       <strong>분류 규칙.</strong> 네이버파이낸셜·네이버페이 비즈월렛 → <strong>스마트스토어</strong> / 카카오_이니시스 → <strong>카카오모먼트</strong> / 카카오(정기결제)_다날 → <strong>키워드광고</strong> / 유니드컴즈·샐러드랩·킵그로우·컷백·채널코퍼레이션·캔바 → <strong>정기결제</strong> / 그 외 → <strong>기타</strong>(원본 매체명 표시).<br><br>
-      <strong>분석 방법.</strong> 일별 집계 → 평균/표준편차/요일별/주간 최대 계산 → 예측 모드(P90 안전 / P75 보수 / avg 균형 / P50 효율)로 회당 이체액 산정. <strong>회당 이체액 = 일 기준값 × (5 영업일 ÷ 주당 빈도) × 브랜드 가중치</strong>로 계산하며, <strong>백만원 단위로 내림</strong> 처리됩니다. 한도 초과 시 자동 캡 적용. 브랜드데이는 평소 "없음"으로 두고, 실제 브랜드데이가 있는 달에만 +30~50%로 한 단계 올리세요. <strong>현재 잔액</strong>은 충전이나 사용이 있을 때마다 수동으로 업데이트해주세요.
+      <strong>분석 방법.</strong> 일별/요일별 집계 → 예측 모드(P90 안전 / P75 보수 / avg 균형 / P50 효율)로 일 기준 사용량 산정 → <strong>요일별 차등 권장</strong>. 각 이체일에 대해 "다음 이체 직전까지의 요일별 평균 사용량 합계"를 권장 금액으로 계산합니다.<br><br>
+      예: 주 3회(월/수/금) 기준 → <strong>월요일 이체</strong>는 월+화 사용 커버, <strong>수요일 이체</strong>는 수+목 커버, <strong>금요일 이체</strong>는 금+토+일 커버. 월요일이 피크라면 자연스럽게 금요일/월요일 이체액이 더 커지고, 토요일이 저점이면 수요일 이체액이 작아집니다. <strong>백만원 단위로 내림</strong>, 한도 초과 시 자동 캡. 브랜드데이는 평소 "없음"으로 두고 실제 브랜드데이가 있는 달에만 +30~50%로 올리세요.
     </div>
 
   </div>
@@ -1924,22 +1998,63 @@ function recalculate() {
   else if (mode === 'p50') dailyForecast = data.p50;
   else dailyForecast = data.dailyAvg;
 
-  // 영업일 기준 사이클: 광고비는 평일에만 쓰이므로 주 5일 영업일 기준
-  const cycleDays = 5 / freq;
-  let perTransferRaw = dailyForecast * cycleDays * brandWeight;
+  // 모드별 스케일 팩터: P50을 기준 1.0으로 잡고 다른 모드의 비율을 요일별 평균에 곱함
+  // (요일별 평균은 단순 평균이므로, 모드 선택에 따라 안전 마진 조정)
+  const scaleFactor = dailyForecast / data.dailyAvg;
 
-  // 백만원 단위로 내림 (효율 우선)
+  // 요일별 차등 계산
   const ROUND_UNIT = 1000000;
-  let perTransfer = Math.floor(perTransferRaw / ROUND_UNIT) * ROUND_UNIT;
-  if (perTransfer < ROUND_UNIT) perTransfer = ROUND_UNIT; // 최소 1백만원
+  const transferDays = FREQ_DAYS[freq]; // 예: [1, 3, 5]
 
-  let limitHit = false;
-  if (perTransfer > transferLimit) {
-    perTransfer = Math.floor(transferLimit / ROUND_UNIT) * ROUND_UNIT;
-    limitHit = true;
+  // 각 이체일이 커버해야 할 요일 범위 계산
+  function calculateCoverage(days) {
+    const result = {};
+    const sorted = [...days].sort((a, b) => a - b);
+    sorted.forEach((day, idx) => {
+      const nextDay = sorted[(idx + 1) % sorted.length];
+      const coverDays = [];
+      let cursor = day;
+      let safety = 0;
+      while (safety++ < 8) {
+        coverDays.push(cursor);
+        cursor = (cursor + 1) % 7;
+        if (cursor === nextDay) break;
+      }
+      result[day] = coverDays;
+    });
+    return result;
   }
 
-  const weeklyTotal = perTransfer * freq;
+  const coverage = calculateCoverage(transferDays);
+
+  // 요일별 권장 이체액 계산
+  const perDayAmounts = {};   // {1: 23000000, 3: 20000000, 5: 27000000} 같은 형태
+  const perDayRawAmounts = {}; // 원본값 (캡 전)
+  const perDayCovers = {};    // {1: [1, 2], 3: [3, 4], 5: [5, 6, 0]}
+  let anyLimitHit = false;
+  let weeklyTotal = 0;
+
+  Object.entries(coverage).forEach(([day, covers]) => {
+    const dayNum = parseInt(day);
+    // 커버하는 요일들의 평균 사용량 합계 × 스케일 × 브랜드 가중
+    const rawSum = covers.reduce((acc, d) => acc + data.wdayAvg[d], 0) * scaleFactor * brandWeight;
+    let amount = Math.floor(rawSum / ROUND_UNIT) * ROUND_UNIT;
+    if (amount < ROUND_UNIT) amount = ROUND_UNIT;
+    if (amount > transferLimit) {
+      amount = Math.floor(transferLimit / ROUND_UNIT) * ROUND_UNIT;
+      anyLimitHit = true;
+    }
+    perDayRawAmounts[dayNum] = rawSum;
+    perDayAmounts[dayNum] = amount;
+    perDayCovers[dayNum] = covers;
+    weeklyTotal += amount;
+  });
+
+  // 평균 회당 이체액 (대표값으로 표시)
+  const perTransfer = Math.round(weeklyTotal / freq);
+  const perTransferRaw = Object.values(perDayRawAmounts).reduce((a, b) => a + b, 0) / freq;
+  const limitHit = anyLimitHit;
+
   const monthlyForecast = dailyForecast * 30 * brandWeight;
 
   // Days until balance hits safety buffer (given current daily forecast)
@@ -1950,8 +2065,8 @@ function recalculate() {
   updateConstraint('cLimit', limitHit,
     limitHit ? '한도 도달' : '통과',
     limitHit
-      ? `이상값 ${fmt(perTransferRaw)}원 → ${fmt(perTransfer)}원 캡 적용`
-      : `회당 ${fmt(perTransfer)}원 ≤ ${fmt(transferLimit)}원`
+      ? `일부 요일 이체액이 한도 ${fmt(transferLimit)}원에 도달하여 캡 적용`
+      : `최대 회당 ${fmt(Math.max(...Object.values(perDayAmounts)))}원 ≤ ${fmt(transferLimit)}원`
   );
 
   updateConstraint('cBuffer', buffer > 10000000 ? 'fail' : false,
@@ -1976,12 +2091,13 @@ function recalculate() {
   }
   updateConstraint('cCover', coverState, coverText, coverDetail);
 
-  const schedule = generateSchedule(freq, perTransfer, dailyForecast, buffer, balance);
+  const schedule = generateSchedule(freq, perDayAmounts, data.wdayAvg, scaleFactor, buffer, balance);
 
   render({
     ...data,
     freq, buffer, mode, brandWeight, dailyForecast,
     perTransfer, weeklyTotal, monthlyForecast,
+    perDayAmounts, perDayCovers,
     balance, daysUntilLow, transferLimit,
     schedule
   });
@@ -2004,7 +2120,7 @@ function updateConstraint(id, state, text, detail) {
   document.getElementById(id + 'Detail').textContent = detail;
 }
 
-function generateSchedule(freq, perTransfer, dailyForecast, buffer, currentBalance) {
+function generateSchedule(freq, perDayAmounts, wdayAvg, scaleFactor, buffer, currentBalance) {
   const days = FREQ_DAYS[freq];
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -2018,7 +2134,7 @@ function generateSchedule(freq, perTransfer, dailyForecast, buffer, currentBalan
       transfers.push({
         date: new Date(day),
         weekday: wd,
-        amount: perTransfer,
+        amount: perDayAmounts[wd] || 0,
         isToday: i === 0
       });
     }
@@ -2037,22 +2153,24 @@ function generateSchedule(freq, perTransfer, dailyForecast, buffer, currentBalan
   });
   transfers.forEach(s => { s.weekTotal = weekMap[s.weekKey]; });
 
-  // Simulate balance starting from currentBalance
+  // 잔액 시뮬레이션: 요일별 실제 평균 사용량 차감 + 요일별 차등 충전
   let bal = currentBalance;
   let transferIdx = 0;
   const balanceTimeline = [];
   for (let i = 0; i < 28; i++) {
     const day = new Date(today);
     day.setDate(today.getDate() + i);
+    const wd = day.getDay();
     // Transfer at start of day if scheduled
     if (transferIdx < transfers.length && transfers[transferIdx].date.getTime() === day.getTime()) {
-      bal += perTransfer;
+      bal += transfers[transferIdx].amount;
       transfers[transferIdx].balanceAfter = bal;
       transferIdx++;
     }
     balanceTimeline.push({ date: new Date(day), balance: bal });
-    // Subtract daily usage
-    bal -= dailyForecast;
+    // 요일별 평균 사용량 × 모드 스케일
+    const dailyUsage = (wdayAvg[wd] || 0) * scaleFactor;
+    bal -= dailyUsage;
   }
 
   return { transfers, balanceTimeline };
@@ -2067,22 +2185,65 @@ function fmtDate(d, full=true) {
   return `${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
 }
 
+function renderPerDayGrid(perDayAmounts, perDayCovers, todayWday) {
+  const grid = document.getElementById('perDayGrid');
+  const cells = document.getElementById('perDayCells');
+  if (!perDayAmounts || Object.keys(perDayAmounts).length === 0) {
+    grid.style.display = 'none';
+    return;
+  }
+  grid.style.display = 'block';
+  cells.innerHTML = '';
+
+  const amounts = Object.values(perDayAmounts);
+  const maxAmt = Math.max(...amounts);
+  const minAmt = Math.min(...amounts);
+
+  // 월화수목금토일 순서로 정렬 (월=1, 일=0)
+  const dayOrder = [1,2,3,4,5,6,0];
+  dayOrder.forEach(wd => {
+    if (perDayAmounts[wd] === undefined) return;
+    const amount = perDayAmounts[wd];
+    const covers = perDayCovers[wd] || [];
+    const cell = document.createElement('div');
+    const isToday = wd === todayWday;
+    let cls = 'per-day-cell';
+    if (amount === maxAmt && amounts.length > 1 && maxAmt !== minAmt) cls += ' peak';
+    else if (amount === minAmt && amounts.length > 1 && maxAmt !== minAmt) cls += ' low';
+    cell.className = cls;
+    const todayMark = isToday ? ' <span style="color:var(--accent); font-weight:800;">· 오늘</span>' : '';
+    const coversText = covers.length > 0
+      ? `커버: ${covers.map(d => WEEKDAY_LABELS[d]).join(', ')} 사용량`
+      : '';
+    cell.innerHTML = `
+      <div class="day-name">${WEEKDAY_LABELS[wd]}요일${todayMark}</div>
+      <div class="day-amount">${fmt(amount)}원</div>
+      <div class="day-covers">${coversText}</div>
+    `;
+    cells.appendChild(cell);
+  });
+}
+
 function render(r) {
   document.getElementById('results').classList.add('show');
   document.getElementById('uploadSection').style.display = 'none';
   document.getElementById('resetBtn').style.display = 'inline-block';
 
-  // Verdict
-  document.getElementById('vAmount').innerHTML = fmt(r.perTransfer) + '<span class="unit">원</span>';
-  document.getElementById('vAmountSub').textContent =
-    `${r.freq}회/주 · ${r.mode.toUpperCase()} 예측 · 브랜드 ×${r.brandWeight}`;
-
-  document.getElementById('vWeekly').innerHTML = fmt(r.weeklyTotal) + '<span class="unit">원</span>';
-  document.getElementById('vWeeklySub').textContent = `주 ${r.freq}회 × ${fmt(r.perTransfer)}원`;
-
-  // Next transfer
+  // 오늘 또는 다음 이체일 정보
   const todayMs = new Date().setHours(0,0,0,0);
   const nextTransfer = r.schedule.transfers.find(t => t.date >= todayMs);
+  const todayAmount = nextTransfer ? nextTransfer.amount : r.perTransfer;
+  const todayWday = nextTransfer ? nextTransfer.weekday : null;
+
+  // Verdict — "회당 이체 금액"을 "다음 이체액"으로 의미 변경 (요일별 차등이므로)
+  document.getElementById('vAmount').innerHTML = fmt(todayAmount) + '<span class="unit">원</span>';
+  document.getElementById('vAmountSub').textContent = nextTransfer
+    ? `${WEEKDAY_LABELS[todayWday]}요일 이체 · ${r.mode.toUpperCase()} 예측 · 브랜드 ×${r.brandWeight}`
+    : `${r.mode.toUpperCase()} 예측 · 브랜드 ×${r.brandWeight}`;
+
+  document.getElementById('vWeekly').innerHTML = fmt(r.weeklyTotal) + '<span class="unit">원</span>';
+  document.getElementById('vWeeklySub').textContent = `${r.freq}회 합산 · 요일별 차등`;
+
   if (nextTransfer) {
     document.getElementById('vWhen').textContent = fmtDate(nextTransfer.date);
     const daysLeft = Math.round((nextTransfer.date - todayMs) / 86400000);
@@ -2091,15 +2252,18 @@ function render(r) {
 
     if (daysLeft === 0) {
       document.getElementById('todayBanner').classList.add('show');
-      document.getElementById('todayBannerAmount').textContent = fmt(r.perTransfer) + '원';
+      document.getElementById('todayBannerAmount').textContent = fmt(todayAmount) + '원';
       document.getElementById('todayBannerSub').textContent =
-        `현재 잔액 ${fmt(r.balance)}원 → 권장 이체액 ${fmt(r.perTransfer)}원`;
-      tryNotify(r.perTransfer);
+        `현재 잔액 ${fmt(r.balance)}원 → ${WEEKDAY_LABELS[todayWday]}요일 권장 이체액 ${fmt(todayAmount)}원`;
+      tryNotify(todayAmount);
     }
   }
 
   document.getElementById('vMonthly').innerHTML = fmt(r.monthlyForecast) + '<span class="unit">원</span>';
   document.getElementById('vMonthlySub').textContent = `일 ${fmt(r.dailyForecast)}원 × 30일`;
+
+  // 요일별 권장 이체액 그리드
+  renderPerDayGrid(r.perDayAmounts, r.perDayCovers, todayWday);
 
   // Balance status banner
   const statusEl = document.getElementById('balanceStatus');
